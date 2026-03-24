@@ -7,13 +7,13 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     """应用配置"""
-    
+
     # Obsidian Vault
     obsidian_vault_path: str = Field(
         default="/Users/liuwj77/StorageObsidian",
         description="Obsidian Vault 绝对路径"
     )
-    
+
     # ChromaDB
     chroma_persist_dir: str = Field(
         default="./data/chroma",
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         default="obsidian_notes",
         description="ChromaDB 集合名称"
     )
-    
+
     # Embedding
     embedding_model: str = Field(
         default="BAAI/bge-m3",
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
         default=8,
         description="Embedding 批处理大小"
     )
-    
+
     # Chunking
     chunk_size: int = Field(
         default=512,
@@ -47,12 +47,18 @@ class Settings(BaseSettings):
         default=50,
         description="块重叠 token 数"
     )
-    
+
     # Server
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=8000)
     debug: bool = Field(default=False)
-    
+
+    # Logging
+    log_level: str = Field(
+        default="INFO",
+        description="日志级别: DEBUG/INFO/WARNING/ERROR"
+    )
+
     # Watcher
     watcher_debounce_seconds: float = Field(
         default=2.0,

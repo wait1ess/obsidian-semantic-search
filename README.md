@@ -141,6 +141,7 @@ curl -X POST http://localhost:8000/api/search \
 | `CHUNK_SIZE` | 512 | 文本块大小 |
 | `CHUNK_OVERLAP` | 50 | 块重叠大小 |
 | `EMBEDDING_BATCH_SIZE` | 8 | 批处理大小 |
+| `LOG_LEVEL` | INFO | 日志级别: DEBUG/INFO/WARNING/ERROR |
 
 ## 🤝 贡献
 

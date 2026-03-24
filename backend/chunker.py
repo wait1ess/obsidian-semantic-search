@@ -6,21 +6,23 @@ import re
 
 class MarkdownChunker:
     """Markdown 结构感知分块器"""
-    
+
     def __init__(
         self,
         chunk_size: int = 512,
         chunk_overlap: int = 50,
-        min_chunk_size: int = 50
+        min_chunk_size: int = 50,
+        vault_path: Path = None
     ):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.min_chunk_size = min_chunk_size
-    
+        self.vault_path = vault_path
+
     def chunk_file(self, file_path: Path) -> List[dict]:
         """
         分块单个 Markdown 文件
-        
+
         Returns:
             List of chunks with metadata:
             [
@@ -41,8 +43,15 @@ class MarkdownChunker:
         except Exception as e:
             print(f"读取文件失败: {file_path} - {e}")
             return []
-        
-        return self.chunk_text(content, source=str(file_path))
+
+        # 计算相对路径作为 source
+        if self.vault_path and file_path.is_relative_to(self.vault_path):
+            source = str(file_path.relative_to(self.vault_path))
+        else:
+            source = str(file_path)
+
+        # 传入相对路径作为 source，绝对路径作为 file_path
+        return self.chunk_text(content, source=source, file_path=str(file_path))
     
     def chunk_text(
         self,

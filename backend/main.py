@@ -9,12 +9,20 @@ import time
 from datetime import datetime
 import os
 import threading
+import logging
 
 from .config import settings
 from .embedder import get_embedder
 from .vectorstore import get_vectorstore
 from .chunker import MarkdownChunker
 from .watcher import init_watcher, get_watcher
+
+# 配置日志
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # ============== 索引进度追踪 ==============
@@ -165,7 +173,8 @@ def get_chunker() -> MarkdownChunker:
     if _chunker is None:
         _chunker = MarkdownChunker(
             chunk_size=settings.chunk_size,
-            chunk_overlap=settings.chunk_overlap
+            chunk_overlap=settings.chunk_overlap,
+            vault_path=settings.vault_path
         )
     return _chunker
 
