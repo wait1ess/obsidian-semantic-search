@@ -317,68 +317,71 @@ async def search(request: SearchRequest):
 
 @app.post("/api/index", response_model=IndexResponse)
 async def full_index(background_tasks: BackgroundTasks):
-    """全量索引"""
+    """全量索引 - 异步后台执行"""
     global _indexing
-    
+
     if _indexing or index_progress.is_running:
         return IndexResponse(
             status="error",
             message="索引任务正在进行中"
         )
-    
+
     _indexing = True
-    
-    try:
-        # 扫描所有 .md 文件
-        md_files = list(settings.vault_path.rglob("*.md"))
-        
-        # 排除 .obsidian 目录
-        md_files = [f for f in md_files if ".obsidian" not in str(f)]
-        
-        # 初始化进度
-        index_progress.start(len(md_files))
-        
-        # 索引
-        total_chunks = 0
-        indexed_files = 0
-        
-        for i, md_file in enumerate(md_files):
-            try:
-                chunks = index_single_file(md_file)
-                total_chunks += chunks
-                indexed_files += 1
-                
-                # 更新进度
-                rel_path = str(md_file.relative_to(settings.vault_path))
-                index_progress.update(i + 1, total_chunks, rel_path)
-                
-                # 更新 watcher 记录
-                watcher = get_watcher()
-                if watcher:
-                    watcher.mark_indexed(md_file)
-                    
-            except Exception as e:
-                print(f"索引失败: {md_file} - {e}")
-        
-        # 完成
-        index_progress.complete(total_chunks)
-        
-        return IndexResponse(
-            status="success",
-            message=f"成功索引 {indexed_files} 个文件",
-            files_indexed=indexed_files,
-            chunks_created=total_chunks,
-            took_seconds=index_progress.to_dict()["elapsed_seconds"]
-        )
-    
-    except Exception as e:
-        return IndexResponse(
-            status="error",
-            message=str(e)
-        )
-    
-    finally:
-        _indexing = False
+
+    def run_index():
+        """在后台线程中执行索引"""
+        try:
+            # 扫描所有 .md 文件
+            md_files = list(settings.vault_path.rglob("*.md"))
+
+            # 排除 .obsidian 目录
+            md_files = [f for f in md_files if ".obsidian" not in str(f)]
+
+            # 初始化进度
+            index_progress.start(len(md_files))
+
+            # 索引
+            total_chunks = 0
+            indexed_files = 0
+
+            for i, md_file in enumerate(md_files):
+                try:
+                    chunks = index_single_file(md_file)
+                    total_chunks += chunks
+                    indexed_files += 1
+
+                    # 更新进度
+                    rel_path = str(md_file.relative_to(settings.vault_path))
+                    index_progress.update(i + 1, total_chunks, rel_path)
+
+                    # 更新 watcher 记录
+                    watcher = get_watcher()
+                    if watcher:
+                        watcher.mark_indexed(md_file)
+
+                except Exception as e:
+                    print(f"索引失败: {md_file} - {e}")
+
+            # 完成
+            index_progress.complete(total_chunks)
+            print(f"✅ 索引完成: {indexed_files} 文件, {total_chunks} 文本块")
+
+        except Exception as e:
+            print(f"❌ 索引错误: {e}")
+            index_progress.error(str(e))
+
+        finally:
+            global _indexing
+            _indexing = False
+
+    # 启动后台线程
+    thread = threading.Thread(target=run_index, daemon=True)
+    thread.start()
+
+    return IndexResponse(
+        status="success",
+        message="索引任务已启动，请轮询 /api/index/progress 获取进度"
+    )
 
 
 @app.post("/api/index/file")

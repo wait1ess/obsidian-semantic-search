@@ -88,8 +88,9 @@ def get_progress():
 
 
 def trigger_sync():
+    """触发全量同步（异步，立即返回）"""
     try:
-        r = httpx.post(f"{BACKEND_URL}/api/index", timeout=600.0)
+        r = httpx.post(f"{BACKEND_URL}/api/index", timeout=10.0)
         return r.json()
     except Exception as e:
         return {"error": str(e)}
@@ -136,11 +137,24 @@ if progress.get("is_running"):
     processed = progress.get("processed_files", 0)
     total = progress.get("total_files", 1)
     current = progress.get("current_file", "")
-    
+    chunks = progress.get("total_chunks", 0)
+    elapsed = progress.get("elapsed_seconds", 0)
+
     st.progress(int(pct) / 100)
-    st.markdown(f'<div class="sync-info">⏳ {pct}% ({processed}/{total}) | 当前: {current}</div>', unsafe_allow_html=True)
-    time.sleep(0.5)
+    st.markdown(f'''
+    <div class="sync-info">
+        ⏳ {pct}% ({processed}/{total} 文件) | {chunks} 文本块 | {elapsed:.0f}秒<br>
+        当前: {current}
+    </div>
+    ''', unsafe_allow_html=True)
+    time.sleep(1)
     st.rerun()
+
+elif progress.get("status") == "completed":
+    # 显示完成状态
+    msg = progress.get("message", "")
+    st.success(f"✅ {msg}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 else:
     # 同步按钮
@@ -148,8 +162,10 @@ else:
         with st.spinner("触发同步..."):
             result = trigger_sync()
         if result.get("status") == "error":
-            st.error(f"❌ {result['message']}")
+            st.error(f"❌ {result.get('message', '未知错误')}")
         else:
+            st.success("🚀 索引任务已启动")
+            time.sleep(0.5)
             st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)

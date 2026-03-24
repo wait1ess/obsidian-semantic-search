@@ -7,7 +7,7 @@
 | 项目 | 内容 |
 |------|------|
 | **项目名称** | obsidian-semantic-search |
-| **版本** | v0.3.7 |
+| **版本** | v0.3.8 |
 | **位置** | `/Users/liuwj77/temp_obsidian_rag` |
 | **GitHub** | https://github.com/wait1ess/obsidian-semantic-search |
 | **许可证** | MIT |
@@ -963,6 +963,7 @@ streamlit run ui/app.py --server.headless true
 
 | 版本 | 说明 |
 |------|------|
+| v0.3.8 | fix: 全量索引改为后台线程执行，解决阻塞问题 |
 | v0.3.7 | fix: 修复UI显示问题 |
 | v0.3.6 | feat: 添加实时进度条 |
 | v0.3.5 | feat: 添加全量同步按钮 |

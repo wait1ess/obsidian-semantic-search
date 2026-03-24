@@ -58,8 +58,11 @@ streamlit run ui/app.py --server.headless true
 ## 📖 使用
 
 1. 首次启动会自动下载 BGE-M3 模型（约 2GB）
-2. 访问 Web UI 进行搜索
-3. 点击路径或「打开笔记」按钮在 Obsidian 中查看原文
+2. 点击「🔄 全量同步」建立索引（后台异步执行，可实时查看进度）
+3. 搜索框输入查询，获取语义相关的笔记片段
+4. 点击路径或「打开笔记」按钮在 Obsidian 中查看原文
+
+> **注意**：全量同步在后台线程执行，索引期间搜索功能仍可正常使用。
 
 ## 🛠️ 技术栈
 
@@ -104,7 +107,12 @@ obsidian-semantic-search/
 |------|------|------|
 | `/health` | GET | 健康检查 |
 | `/api/search` | POST | 语义检索 |
+| `/api/index` | POST | 全量索引（异步后台执行） |
+| `/api/index/progress` | GET | 获取索引进度 |
 | `/api/stats` | GET | 统计信息 |
+| `/api/sync/pause` | POST | 暂停文件监听 |
+| `/api/sync/resume` | POST | 恢复文件监听 |
+| `/api/reset` | DELETE | 重置向量库 |
 
 ### 搜索示例
 
