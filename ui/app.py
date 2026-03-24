@@ -2,8 +2,6 @@
 import streamlit as st
 import httpx
 import urllib.parse
-import markdown
-import bleach
 
 # 配置
 BACKEND_URL = "http://127.0.0.1:8000"
