@@ -6,9 +6,7 @@ import time
 from pathlib import Path
 
 # 配置
-BACKEND_URL = "http://backend:8000"
-# 本地开发时使用
-# BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://localhost:8000"
 
 st.set_page_config(
     page_title="Obsidian 语义检索",

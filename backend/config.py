@@ -34,7 +34,7 @@ class Settings(BaseSettings):
         description="计算设备: auto/cpu/cuda/mps"
     )
     embedding_batch_size: int = Field(
-        default=32,
+        default=8,
         description="Embedding 批处理大小"
     )
     

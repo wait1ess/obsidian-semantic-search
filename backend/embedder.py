@@ -82,22 +82,37 @@ class Embedder:
                 uncached_texts.append(text)
                 uncached_indices.append(i)
         
-        # 处理未缓存的文本
+        # 处理未缓存的文本 - 分批处理避免内存溢出
         if uncached_texts:
             print(f"Embedding {len(uncached_texts)} 个文本块...")
-            new_embeddings = self.model.encode(
-                uncached_texts,
-                batch_size=self.batch_size,
-                show_progress_bar=len(uncached_texts) > 10,
-                convert_to_numpy=True,
-                normalize_embeddings=True  # 归一化，便于余弦相似度
-            )
+            
+            # 分批处理
+            all_new_embeddings = []
+            batch_size = min(self.batch_size, 8)  # 限制批次大小
+            
+            for i in range(0, len(uncached_texts), batch_size):
+                batch = uncached_texts[i:i+batch_size]
+                print(f"  处理批次 {i//batch_size + 1}/{(len(uncached_texts)-1)//batch_size + 1}")
+                
+                batch_embeddings = self.model.encode(
+                    batch,
+                    batch_size=len(batch),
+                    show_progress_bar=False,
+                    convert_to_numpy=True,
+                    normalize_embeddings=True
+                )
+                all_new_embeddings.extend(batch_embeddings)
             
             # 更新缓存和结果
-            for idx, text, emb in zip(uncached_indices, uncached_texts, new_embeddings):
+            for idx, text, emb in zip(uncached_indices, uncached_texts, all_new_embeddings):
                 cache_key = self._get_cache_key(text)
                 self._cache[cache_key] = emb.tolist()
                 embeddings[idx] = emb.tolist()
+            
+            # 清理
+            del all_new_embeddings
+            import gc
+            gc.collect()
         
         return embeddings
     
