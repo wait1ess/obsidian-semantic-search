@@ -14,180 +14,295 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 美化样式
+# GitHub 风格样式
 st.markdown("""
 <style>
-    /* 全局样式 */
+    /* ===== 全局样式 ===== */
     .stApp {
-        background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-        min-height: 100vh;
+        background-color: #0d1117;
+        color: #c9d1d9;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
     }
     
-    /* 隐藏 Streamlit 默认元素 */
+    /* 隐藏默认元素 */
     #MainMenu, footer, header {visibility: hidden;}
     .stDeployButton {display: none;}
     
-    /* 搜索框样式 */
-    .stTextInput > div > div > input {
-        background-color: #1e1e2e !important;
-        border: 2px solid #3a3a5a !important;
-        border-radius: 12px !important;
-        font-size: 1.1rem !important;
-        padding: 1rem 1.5rem !important;
-        color: #e0e0e0 !important;
-        transition: all 0.3s ease;
-    }
-    .stTextInput > div > div > input:focus {
-        border-color: #7C3AED !important;
-        box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.2) !important;
-    }
-    .stTextInput > div > div > input::placeholder {
-        color: #666 !important;
-    }
-    
-    /* 标题样式 */
+    /* ===== 标题样式 ===== */
     .main-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #7C3AED 0%, #4CAF50 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 2rem;
+        font-weight: 600;
+        color: #f0f6fc;
         text-align: center;
-        margin-bottom: 0.5rem;
+        padding: 1.5rem 0 0.5rem 0;
+    }
+    .main-title span {
+        color: #58a6ff;
     }
     .subtitle {
-        color: #888;
+        color: #8b949e;
         text-align: center;
-        font-size: 1rem;
-        margin-bottom: 2rem;
+        font-size: 0.95rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #21262d;
     }
     
-    /* 示例按钮 */
+    /* ===== 搜索框 ===== */
+    .stTextInput > div > div > input {
+        background-color: #0d1117 !important;
+        border: 1px solid #30363d !important;
+        border-radius: 6px !important;
+        font-size: 1rem !important;
+        padding: 0.75rem 1rem !important;
+        color: #c9d1d9 !important;
+        transition: all 0.15s ease;
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #58a6ff !important;
+        box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3) !important;
+        background-color: #161b22 !important;
+    }
+    .stTextInput > div > div > input::placeholder {
+        color: #484f58 !important;
+    }
+    
+    /* ===== 示例按钮 ===== */
+    .example-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+        padding: 1rem 0;
+    }
     .example-btn {
-        background: linear-gradient(135deg, #2a2a4a 0%, #3a3a5a 100%);
-        border: 1px solid #4a4a6a;
-        color: #bbb;
-        padding: 0.6rem 1.2rem;
-        border-radius: 25px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-size: 0.9rem;
-    }
-    .example-btn:hover {
-        background: linear-gradient(135deg, #3a3a5a 0%, #4a4a6a 100%);
-        border-color: #7C3AED;
-        color: #fff;
-        transform: translateY(-2px);
-    }
-    
-    /* 结果卡片 */
-    .result-card {
-        background: linear-gradient(135deg, #1a1a2e 0%, #1e1e3a 100%);
-        border: 1px solid #2a2a4a;
-        border-radius: 16px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        transition: all 0.3s ease;
-    }
-    .result-card:hover {
-        border-color: #4a4a7a;
-        box-shadow: 0 8px 32px rgba(124, 58, 237, 0.15);
-        transform: translateY(-2px);
-    }
-    
-    /* 分数徽章 */
-    .score-high {
-        background: linear-gradient(135deg, #4CAF50, #2E7D32);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-    .score-mid {
-        background: linear-gradient(135deg, #FFC107, #FF8F00);
-        color: #1a1a2e;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-    .score-low {
-        background: linear-gradient(135deg, #616161, #424242);
-        color: #ccc;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-weight: 500;
-        font-size: 0.95rem;
-    }
-    
-    /* 路径链接 */
-    .path-link {
-        color: #7C3AED !important;
-        text-decoration: none;
-        font-size: 0.9rem;
-        transition: color 0.2s;
-    }
-    .path-link:hover {
-        color: #A78BFA !important;
-        text-decoration: underline;
-    }
-    
-    /* Markdown 内容样式 */
-    .result-content h1, .result-content h2, .result-content h3 {
-        color: #e0e0e0 !important;
-        margin-top: 0.5rem !important;
-        margin-bottom: 0.5rem !important;
-    }
-    .result-content table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
-    .result-content th { background: #2a2a4a; color: #e0e0e0; padding: 0.5rem; border: 1px solid #3a3a5a; }
-    .result-content td { color: #ccc; padding: 0.5rem; border: 1px solid #3a3a5a; }
-    .result-content code { background-color: #2a2a4a; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.85rem; color: #A78BFA; }
-    .result-content pre { background-color: #1a1a2e; padding: 1rem; border-radius: 8px; overflow-x: auto; border: 1px solid #2a2a4a; }
-    .result-content pre code { background: none; padding: 0; }
-    .result-content blockquote { border-left: 4px solid #7C3AED; padding-left: 1rem; color: #aaa; margin: 0.5rem 0; }
-    .result-content ul, .result-content ol { color: #ccc; }
-    .result-content a { color: #7C3AED; }
-    .result-content strong { color: #e0e0e0; }
-    
-    /* 打开按钮 */
-    .open-btn {
-        background: linear-gradient(135deg, #7C3AED, #6D28D9);
-        color: white;
-        border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
+        background-color: #21262d;
+        border: 1px solid #30363d;
+        color: #8b949e;
+        padding: 0.4rem 0.9rem;
+        border-radius: 6px;
         font-size: 0.85rem;
         cursor: pointer;
-        transition: all 0.2s;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
+        transition: all 0.15s ease;
     }
-    .open-btn:hover {
-        background: linear-gradient(135deg, #8B5CF6, #7C3AED);
-        transform: scale(1.02);
+    .example-btn:hover {
+        background-color: #30363d;
+        border-color: #8b949e;
+        color: #f0f6fc;
     }
     
-    /* 统计信息 */
+    /* ===== 统计栏 ===== */
     .stats-bar {
-        background: rgba(124, 58, 237, 0.1);
-        border: 1px solid rgba(124, 58, 237, 0.3);
-        border-radius: 12px;
-        padding: 0.8rem 1.5rem;
+        background-color: #161b22;
+        border: 1px solid #21262d;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
         margin: 1rem 0;
         display: flex;
-        justify-content: space-between;
-        align-items: center;
+        gap: 1.5rem;
+        color: #8b949e;
+        font-size: 0.9rem;
+    }
+    .stats-bar strong {
+        color: #f0f6fc;
     }
     
-    /* 分隔线 */
-    hr {
+    /* ===== 结果卡片 ===== */
+    .result-card {
+        background-color: #161b22;
+        border: 1px solid #21262d;
+        border-radius: 6px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+    .result-card:hover {
+        border-color: #30363d;
+    }
+    
+    /* ===== 分数徽章 ===== */
+    .score-badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 2em;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+    .score-high {
+        background-color: #238636;
+        color: #ffffff;
+    }
+    .score-mid {
+        background-color: #9e6a03;
+        color: #ffffff;
+    }
+    .score-low {
+        background-color: #30363d;
+        color: #8b949e;
+    }
+    
+    /* ===== 路径区域 ===== */
+    .path-area {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #21262d;
+        margin-bottom: 0.75rem;
+    }
+    .path-link {
+        color: #58a6ff;
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    .path-link:hover {
+        text-decoration: underline;
+    }
+    .heading-tag {
+        color: #7ee787;
+        font-size: 0.85rem;
+        margin-left: 0.5rem;
+    }
+    .full-path {
+        color: #484f58;
+        font-size: 0.75rem;
+        margin-top: 0.25rem;
+        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    }
+    
+    /* ===== 操作按钮 ===== */
+    .action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background-color: #21262d;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+        padding: 0.35rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+    .action-btn:hover {
+        background-color: #30363d;
+        border-color: #8b949e;
+        color: #f0f6fc;
+    }
+    .action-btn-primary {
+        background-color: #238636;
+        border-color: #238636;
+        color: #ffffff;
+    }
+    .action-btn-primary:hover {
+        background-color: #2ea043;
+        border-color: #2ea043;
+    }
+    
+    /* ===== Markdown 内容 ===== */
+    .content-area {
+        color: #c9d1d9;
+        line-height: 1.6;
+        font-size: 0.9rem;
+    }
+    .content-area h1, .content-area h2, .content-area h3 {
+        color: #f0f6fc;
+        margin: 0.75rem 0 0.5rem 0;
+        font-weight: 600;
+    }
+    .content-area h1 { font-size: 1.25rem; }
+    .content-area h2 { font-size: 1.1rem; }
+    .content-area h3 { font-size: 1rem; }
+    .content-area table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.5rem 0;
+    }
+    .content-area th {
+        background-color: #21262d;
+        color: #f0f6fc;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #30363d;
+        text-align: left;
+        font-weight: 600;
+    }
+    .content-area td {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+    }
+    .content-area tr:nth-child(even) td {
+        background-color: #0d1117;
+    }
+    .content-area code {
+        background-color: #343942;
+        color: #f0f6fc;
+        padding: 0.15rem 0.4rem;
+        border-radius: 6px;
+        font-size: 0.85em;
+        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    }
+    .content-area pre {
+        background-color: #161b22;
+        border: 1px solid #21262d;
+        border-radius: 6px;
+        padding: 1rem;
+        overflow-x: auto;
+        margin: 0.75rem 0;
+    }
+    .content-area pre code {
+        background: none;
+        padding: 0;
+        border-radius: 0;
+        font-size: 0.85rem;
+    }
+    .content-area blockquote {
+        border-left: 3px solid #3b82f6;
+        padding-left: 1rem;
+        color: #8b949e;
+        margin: 0.75rem 0;
+    }
+    .content-area ul, .content-area ol {
+        padding-left: 1.5rem;
+    }
+    .content-area li {
+        margin: 0.25rem 0;
+    }
+    .content-area a {
+        color: #58a6ff;
+    }
+    .content-area strong {
+        color: #f0f6fc;
+        font-weight: 600;
+    }
+    .content-area em {
+        color: #8b949e;
+    }
+    .content-area hr {
         border: none;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, #3a3a5a, transparent);
-        margin: 2rem 0;
+        border-top: 1px solid #21262d;
+        margin: 1rem 0;
+    }
+    
+    /* ===== 加载更多 ===== */
+    .load-more {
+        text-align: center;
+        padding: 1rem;
+        color: #8b949e;
+        font-size: 0.85rem;
+    }
+    
+    /* ===== Select 样式 ===== */
+    .stSelectbox > div > div {
+        background-color: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+    }
+    .stSelectbox > div > div:hover {
+        border-color: #8b949e;
+    }
+    
+    /* ===== 分隔线 ===== */
+    .divider {
+        border: none;
+        border-top: 1px solid #21262d;
+        margin: 1.5rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -207,16 +322,15 @@ def search(query: str, top_k: int = 10):
         response.raise_for_status()
         return response.json()
     except httpx.ConnectError:
-        return {"error": "无法连接后端服务，请检查后端是否启动"}
+        return {"error": "无法连接后端服务"}
     except httpx.TimeoutException:
-        return {"error": "搜索超时，请稍后重试"}
+        return {"error": "搜索超时"}
     except Exception as e:
-        return {"error": f"搜索失败: {str(e)}"}
+        return {"error": f"搜索失败"}
 
 
 def get_obsidian_url(file_path: str):
     """生成 Obsidian 打开链接"""
-    # 移除绝对路径前缀，获取相对路径
     if file_path.startswith("/Users/"):
         parts = file_path.split("/StorageObsidian/")
         if len(parts) > 1:
@@ -225,67 +339,61 @@ def get_obsidian_url(file_path: str):
             relative_path = file_path.split("/")[-1]
     else:
         relative_path = file_path
-    
-    # URL 编码
     encoded_path = urllib.parse.quote(relative_path)
-    
-    # Obsidian URI
     return f"obsidian://open?vault={OBSIDIAN_VAULT}&file={encoded_path}"
-
-
-def get_finder_url(file_path: str):
-    """生成 Finder 打开链接"""
-    return f"file://{file_path}"
 
 
 # ============== Main UI ==============
 
 # 标题
-st.markdown('<h1 class="main-title">🔍 Obsidian 语义检索</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">🔍 <span>Obsidian</span> 语义检索</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">基于 BGE-M3 向量模型的知识库搜索引擎</p>', unsafe_allow_html=True)
 
 # 搜索框
-col_search, col_k = st.columns([6, 1])
+col_search, col_k = st.columns([5, 1])
 with col_search:
     query = st.text_input(
         "搜索",
-        placeholder="输入查询内容，如：SQL注入的防御方法、XSS攻击类型...",
+        placeholder="搜索你的知识库...",
         label_visibility="collapsed"
     )
 with col_k:
-    top_k = st.selectbox("结果数", [5, 10, 15, 20], index=1, label_visibility="collapsed")
+    top_k = st.selectbox("结果", [5, 10, 15, 20], index=1, label_visibility="collapsed")
 
 # 示例查询
 if not query:
-    st.markdown("<div style='text-align: center; margin: 1rem 0;'>", unsafe_allow_html=True)
-    examples = [
-        "SQL注入防御", "XSS攻击", "内网渗透", 
-        "Docker安全", "Kubernetes", "密码学"
-    ]
-    cols = st.columns(len(examples))
+    st.markdown('<div class="example-container">', unsafe_allow_html=True)
+    cols = st.columns(6)
+    examples = ["SQL注入", "XSS攻击", "内网渗透", "Docker", "Kubernetes", "密码学"]
     for i, ex in enumerate(examples):
         if cols[i].button(ex, key=f"ex_{i}", use_container_width=True):
             st.session_state["query"] = ex
             st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
 # 执行搜索
 if query:
-    with st.spinner("🔍 搜索中..."):
+    with st.spinner(""):
         result = search(query, top_k)
     
     if "error" in result:
         st.error(f"❌ {result['error']}")
     elif "results" in result:
         if not result["results"]:
-            st.info("🔍 未找到相关结果，请尝试其他关键词")
+            st.markdown("""
+            <div style="text-align: center; padding: 3rem; color: #8b949e;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+                <div>未找到相关结果</div>
+                <div style="font-size: 0.85rem; margin-top: 0.5rem;">尝试使用不同的关键词</div>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             # 结果统计
             st.markdown(f"""
             <div class="stats-bar">
-                <span>📊 找到 <strong>{result['total']}</strong> 条相关结果</span>
-                <span>⏱️ 耗时 {result['took_ms']}ms</span>
+                <span><strong>{result['total']}</strong> 个结果</span>
+                <span>耗时 <strong>{result['took_ms']}</strong>ms</span>
             </div>
             """, unsafe_allow_html=True)
             
@@ -299,16 +407,12 @@ if query:
                 # 相对路径
                 if source.startswith("/Users/"):
                     parts = source.split("/StorageObsidian/")
-                    if len(parts) > 1:
-                        relative_path = parts[1]
-                    else:
-                        relative_path = source.split("/")[-1]
+                    relative_path = parts[1] if len(parts) > 1 else source.split("/")[-1]
                 else:
                     relative_path = source
                 
                 # Obsidian 链接
                 obsidian_url = get_obsidian_url(source)
-                finder_url = get_finder_url(source)
                 
                 # 分数样式
                 if score >= 0.7:
@@ -321,37 +425,26 @@ if query:
                 # 卡片
                 st.markdown(f"""
                 <div class="result-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                        <div>
-                            <span class="{score_class}">{score:.0%}</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <a href="{obsidian_url}" class="open-btn" target="_blank">
-                                📝 在 Obsidian 中打开
-                            </a>
-                        </div>
-                    </div>
-                    <div style="margin-bottom: 0.5rem;">
-                        <a href="{obsidian_url}" class="path-link" title="点击在 Obsidian 中打开">
-                            📄 {relative_path}
-                        </a>
-                        {f'<span style="color: #4CAF50; margin-left: 0.5rem;">› {heading}</span>' if heading else ''}
-                    </div>
-                    <div style="color: #888; font-size: 0.8rem; margin-bottom: 1rem;">
-                        <a href="{finder_url}" style="color: #666; text-decoration: none;" title="在 Finder 中显示">
-                            📁 {source}
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="score-badge {score_class}">{score:.0%} 匹配</span>
+                        <a href="{obsidian_url}" class="action-btn action-btn-primary" target="_blank">
+                            打开笔记
                         </a>
                     </div>
-                </div>
+                    <div class="path-area">
+                        <a href="{obsidian_url}" class="path-link">📄 {relative_path}</a>
+                        {f'<span class="heading-tag">› {heading}</span>' if heading else ''}
+                        <div class="full-path">{source}</div>
+                    </div>
                 """, unsafe_allow_html=True)
                 
-                # Markdown 内容
-                if len(content) > 800:
-                    content = content[:800]
+                # 内容
+                if len(content) > 700:
+                    content = content[:700]
                     last_newline = content.rfind("\n")
-                    if last_newline > 500:
+                    if last_newline > 400:
                         content = content[:last_newline]
-                    content += "\n\n---\n*📖 点击上方「在 Obsidian 中打开」查看完整内容*"
+                    content += "\n\n---\n*点击「打开笔记」查看完整内容*"
                 
-                st.markdown(f'<div class="result-content">{content}</div>', unsafe_allow_html=True)
-                st.markdown("<hr>", unsafe_allow_html=True)
+                st.markdown(f'<div class="content-area">{content}</div>', unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
