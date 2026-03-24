@@ -36,7 +36,8 @@ st.markdown("""
     .stats-bar strong { color: #f0f6fc; }
     
     .sync-section { background-color: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
-    .sync-title { color: #f0f6fc; font-weight: 600; margin-bottom: 0.5rem; }
+    .sync-title { color: #f0f6fc; font-weight: 600; margin-bottom: 0.75rem; font-size: 1rem; }
+    .sync-info { color: #8b949e; font-size: 0.85rem; margin-bottom: 0.75rem; }
     
     .result-card { background-color: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
     .result-card:hover { border-color: #30363d; }
@@ -61,29 +62,20 @@ st.markdown("""
     .md-content h1 { color: #f0f6fc; font-size: 1.4rem; margin: 1rem 0 0.5rem 0; font-weight: 600; border-bottom: 1px solid #21262d; padding-bottom: 0.3rem; }
     .md-content h2 { color: #f0f6fc; font-size: 1.2rem; margin: 0.9rem 0 0.5rem 0; font-weight: 600; }
     .md-content h3 { color: #f0f6fc; font-size: 1.05rem; margin: 0.8rem 0 0.4rem 0; font-weight: 600; }
-    .md-content h4, .md-content h5, .md-content h6 { color: #e6edf3; font-size: 1rem; margin: 0.6rem 0 0.3rem 0; font-weight: 600; }
     .md-content table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
     .md-content th { background-color: #21262d; color: #f0f6fc; padding: 0.6rem 0.8rem; border: 1px solid #30363d; text-align: left; font-weight: 600; }
     .md-content td { padding: 0.6rem 0.8rem; border: 1px solid #30363d; color: #c9d1d9; }
-    .md-content tr:nth-child(even) td { background-color: #0d1117; }
     .md-content code { background-color: #343942; color: #f0f6fc; padding: 0.2rem 0.45rem; border-radius: 6px; font-size: 0.88em; font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace; }
     .md-content pre { background-color: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 1rem; overflow-x: auto; margin: 0.75rem 0; }
     .md-content pre code { background: none; padding: 0; border-radius: 0; font-size: 0.85rem; color: #c9d1d9; }
     .md-content blockquote { border-left: 4px solid #3b82f6; padding: 0.5rem 1rem; margin: 0.75rem 0; color: #8b949e; background-color: #0d1117; border-radius: 0 6px 6px 0; }
     .md-content ul, .md-content ol { padding-left: 1.5rem; margin: 0.5rem 0; }
-    .md-content li { margin: 0.3rem 0; }
     .md-content a { color: #58a6ff; text-decoration: none; }
-    .md-content a:hover { text-decoration: underline; }
     .md-content strong { color: #f0f6fc; font-weight: 600; }
-    .md-content em { color: #8b949e; font-style: italic; }
     .md-content hr { border: none; border-top: 1px solid #21262d; margin: 1rem 0; }
     .md-content p { margin: 0.5rem 0; }
     
     .stSelectbox > div > div { background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; }
-    
-    /* 进度条样式 */
-    .stProgress > div > div > div { background-color: #238636; }
-    .stProgress > div > div { background-color: #21262d; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,6 +113,15 @@ def trigger_sync():
         return {"error": str(e)}
 
 
+def get_progress():
+    """获取索引进度"""
+    try:
+        response = httpx.get(f"{BACKEND_URL}/api/index/progress", timeout=5.0)
+        return response.json()
+    except:
+        return {"is_running": False}
+
+
 def get_stats():
     """获取统计信息"""
     try:
@@ -135,8 +136,6 @@ if "search_query" not in st.session_state:
     st.session_state["search_query"] = ""
 if "syncing" not in st.session_state:
     st.session_state["syncing"] = False
-if "sync_result" not in st.session_state:
-    st.session_state["sync_result"] = None
 
 # ============== Main UI ==============
 
@@ -151,35 +150,54 @@ st.markdown('<div class="sync-title">📂 向量库同步</div>', unsafe_allow_h
 stats = get_stats()
 if stats:
     st.markdown(f"""
-    <div style="display: flex; gap: 2rem; align-items: center; margin-bottom: 0.5rem;">
-        <span>📄 <strong>{stats['total_files']}</strong> 个文件已索引</span>
+    <div style="display: flex; gap: 2rem; align-items: center; margin-bottom: 0.75rem;">
+        <span>📄 <strong>{stats['total_files']}</strong> 个文件</span>
         <span>📝 <strong>{stats['total_chunks']}</strong> 个文本块</span>
-        <span>🔄 实时监听: {'✅ 运行中' if stats.get('watcher_running') else '⏹️ 已停止'}</span>
+        <span>🔄 实时监听: {'✅' if stats.get('watcher_running') else '⏹️'}</span>
     </div>
     """, unsafe_allow_html=True)
 
-sync_col1, sync_col2 = st.columns([1, 4])
-with sync_col1:
+# 检查是否正在同步
+progress = get_progress()
+
+if progress.get("is_running"):
+    st.session_state["syncing"] = True
+    
+    # 显示进度条
+    progress_percent = progress.get("progress_percent", 0)
+    processed = progress.get("processed_files", 0)
+    total = progress.get("total_files", 1)
+    current_file = progress.get("current_file", "")
+    
+    st.progress(int(progress_percent) / 100)
+    st.markdown(f"""
+    <div class="sync-info">
+        ⏳ 正在索引... {progress_percent}% ({processed}/{total})<br>
+        当前文件: {current_file}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 自动刷新
+    time.sleep(0.5)
+    st.rerun()
+
+elif st.session_state["syncing"]:
+    # 同步刚完成
+    st.session_state["syncing"] = False
+    if progress.get("status") == "completed":
+        st.success(f"✅ {progress.get('message', '同步完成')}")
+    st.rerun()
+
+else:
+    # 显示同步按钮
     if st.button("🔄 全量同步", use_container_width=True, type="primary"):
         st.session_state["syncing"] = True
-        st.session_state["sync_result"] = None
-
-if st.session_state["syncing"]:
-    with st.spinner("正在同步..."):
         result = trigger_sync()
-        st.session_state["syncing"] = False
-        st.session_state["sync_result"] = result
-        st.rerun()
-
-if st.session_state["sync_result"]:
-    result = st.session_state["sync_result"]
-    if result.get("status") == "success":
-        st.success(f"✅ {result['message']} | {result['chunks_created']} chunks | {result['took_seconds']}s")
-        st.session_state["sync_result"] = None
-    elif result.get("status") == "error":
-        st.error(f"❌ {result['message']}")
-    else:
-        st.warning(f"⚠️ {result.get('error', '同步失败')}")
+        if result.get("status") == "error":
+            st.error(f"❌ {result['message']}")
+            st.session_state["syncing"] = False
+        else:
+            st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -198,38 +216,30 @@ with col_k:
 
 # 示例查询
 if not query:
-    # Web 安全
     st.markdown('<div class="example-category">🌐 Web 安全</div>', unsafe_allow_html=True)
     cols = st.columns(4)
-    web_examples = ["SQL注入绕过WAF", "XSS窃取Cookie", "CSRF攻击原理", "SSRF内网探测"]
-    for i, ex in enumerate(web_examples):
+    for i, ex in enumerate(["SQL注入绕过WAF", "XSS窃取Cookie", "CSRF攻击原理", "SSRF内网探测"]):
         if cols[i].button(ex, key=f"web_{i}", use_container_width=True):
             st.session_state["search_query"] = ex
             st.rerun()
     
-    # 渗透测试
     st.markdown('<div class="example-category">🎯 渗透测试</div>', unsafe_allow_html=True)
     cols = st.columns(4)
-    pentest_examples = ["内网横向移动", "权限提升方法", "凭据窃取技术", "免杀绕过技巧"]
-    for i, ex in enumerate(pentest_examples):
+    for i, ex in enumerate(["内网横向移动", "权限提升方法", "凭据窃取技术", "免杀绕过技巧"]):
         if cols[i].button(ex, key=f"pentest_{i}", use_container_width=True):
             st.session_state["search_query"] = ex
             st.rerun()
     
-    # 云安全
     st.markdown('<div class="example-category">☁️ 云安全</div>', unsafe_allow_html=True)
     cols = st.columns(4)
-    cloud_examples = ["Docker逃逸方法", "Kubernetes攻击面", "AWS IAM提权", "容器安全配置"]
-    for i, ex in enumerate(cloud_examples):
+    for i, ex in enumerate(["Docker逃逸方法", "Kubernetes攻击面", "AWS IAM提权", "容器安全配置"]):
         if cols[i].button(ex, key=f"cloud_{i}", use_container_width=True):
             st.session_state["search_query"] = ex
             st.rerun()
     
-    # 密码学
     st.markdown('<div class="example-category">🔐 密码学</div>', unsafe_allow_html=True)
     cols = st.columns(4)
-    crypto_examples = ["RSA攻击方法", "AES加密模式", "哈希碰撞攻击", "证书伪造技术"]
-    for i, ex in enumerate(crypto_examples):
+    for i, ex in enumerate(["RSA攻击方法", "AES加密模式", "哈希碰撞攻击", "证书伪造技术"]):
         if cols[i].button(ex, key=f"crypto_{i}", use_container_width=True):
             st.session_state["search_query"] = ex
             st.rerun()
@@ -245,7 +255,7 @@ if query:
         st.error(f"❌ {result['error']}")
     elif "results" in result:
         if not result["results"]:
-            st.markdown('<div style="text-align: center; padding: 3rem; color: #8b949e;"><div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div><div>未找到相关结果</div></div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center; padding: 3rem; color: #8b949e;"><div style="font-size: 3rem;">🔍</div><div>未找到相关结果</div></div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="stats-bar"><span><strong>{result["total"]}</strong> 个结果</span><span>耗时 <strong>{result["took_ms"]}</strong>ms</span></div>', unsafe_allow_html=True)
             

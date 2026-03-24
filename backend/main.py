@@ -8,12 +8,78 @@ import asyncio
 import time
 from datetime import datetime
 import os
+import threading
 
 from .config import settings
 from .embedder import get_embedder
 from .vectorstore import get_vectorstore
 from .chunker import MarkdownChunker
 from .watcher import init_watcher, get_watcher
+
+
+# ============== 索引进度追踪 ==============
+class IndexProgress:
+    """索引进度状态"""
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.is_running = False
+        self.total_files = 0
+        self.processed_files = 0
+        self.total_chunks = 0
+        self.current_file = ""
+        self.start_time = None
+        self.status = "idle"  # idle, running, completed, error
+        self.message = ""
+    
+    def start(self, total_files: int):
+        with self.lock:
+            self.is_running = True
+            self.total_files = total_files
+            self.processed_files = 0
+            self.total_chunks = 0
+            self.current_file = ""
+            self.start_time = time.time()
+            self.status = "running"
+            self.message = "开始索引..."
+    
+    def update(self, processed: int, chunks: int, current_file: str):
+        with self.lock:
+            self.processed_files = processed
+            self.total_chunks = chunks
+            self.current_file = current_file
+            self.message = f"正在处理: {current_file}"
+    
+    def complete(self, total_chunks: int):
+        with self.lock:
+            self.is_running = False
+            self.status = "completed"
+            self.total_chunks = total_chunks
+            self.message = f"完成！索引 {self.processed_files} 个文件，{total_chunks} 个文本块"
+    
+    def error(self, message: str):
+        with self.lock:
+            self.is_running = False
+            self.status = "error"
+            self.message = message
+    
+    def to_dict(self) -> dict:
+        with self.lock:
+            elapsed = time.time() - self.start_time if self.start_time else 0
+            progress = (self.processed_files / self.total_files * 100) if self.total_files > 0 else 0
+            return {
+                "is_running": self.is_running,
+                "status": self.status,
+                "total_files": self.total_files,
+                "processed_files": self.processed_files,
+                "total_chunks": self.total_chunks,
+                "current_file": self.current_file,
+                "progress_percent": round(progress, 1),
+                "elapsed_seconds": round(elapsed, 1),
+                "message": self.message
+            }
+
+# 全局进度实例
+index_progress = IndexProgress()
 
 
 # ============== Models ==============
@@ -254,34 +320,37 @@ async def full_index(background_tasks: BackgroundTasks):
     """全量索引"""
     global _indexing
     
-    if _indexing:
+    if _indexing or index_progress.is_running:
         return IndexResponse(
             status="error",
             message="索引任务正在进行中"
         )
     
     _indexing = True
-    start_time = time.time()
     
     try:
         # 扫描所有 .md 文件
         md_files = list(settings.vault_path.rglob("*.md"))
         
         # 排除 .obsidian 目录
-        md_files = [
-            f for f in md_files 
-            if ".obsidian" not in str(f)
-        ]
+        md_files = [f for f in md_files if ".obsidian" not in str(f)]
+        
+        # 初始化进度
+        index_progress.start(len(md_files))
         
         # 索引
         total_chunks = 0
         indexed_files = 0
         
-        for md_file in md_files:
+        for i, md_file in enumerate(md_files):
             try:
                 chunks = index_single_file(md_file)
                 total_chunks += chunks
                 indexed_files += 1
+                
+                # 更新进度
+                rel_path = str(md_file.relative_to(settings.vault_path))
+                index_progress.update(i + 1, total_chunks, rel_path)
                 
                 # 更新 watcher 记录
                 watcher = get_watcher()
@@ -291,14 +360,15 @@ async def full_index(background_tasks: BackgroundTasks):
             except Exception as e:
                 print(f"索引失败: {md_file} - {e}")
         
-        took_seconds = time.time() - start_time
+        # 完成
+        index_progress.complete(total_chunks)
         
         return IndexResponse(
             status="success",
             message=f"成功索引 {indexed_files} 个文件",
             files_indexed=indexed_files,
             chunks_created=total_chunks,
-            took_seconds=round(took_seconds, 2)
+            took_seconds=index_progress.to_dict()["elapsed_seconds"]
         )
     
     except Exception as e:
@@ -348,6 +418,12 @@ async def get_stats():
         watcher_running=watcher.is_running() if watcher else False,
         last_events=last_events
     )
+
+
+@app.get("/api/index/progress")
+async def get_index_progress():
+    """获取索引进度"""
+    return index_progress.to_dict()
 
 
 @app.post("/api/sync/pause")
