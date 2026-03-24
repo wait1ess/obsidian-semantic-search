@@ -42,12 +42,23 @@ obsidian_vault_path: str = "/path/to/your/obsidian/vault"
 
 ### 4. 启动服务
 
+**一键启动：**
+```bash
+./start.sh
+```
+
+**手动启动：**
 ```bash
 # 终端 1: 启动后端
 python -m backend.main
 
 # 终端 2: 启动 Web UI
 streamlit run ui/app.py --server.headless true
+```
+
+**停止服务：**
+```bash
+./stop.sh
 ```
 
 ### 5. 访问
