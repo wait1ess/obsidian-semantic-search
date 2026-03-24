@@ -2,6 +2,7 @@
 import streamlit as st
 import httpx
 import urllib.parse
+import time
 
 # 配置
 BACKEND_URL = "http://127.0.0.1:8000"
@@ -23,18 +24,19 @@ st.markdown("""
     
     .main-title { font-size: 2rem; font-weight: 600; color: #f0f6fc; text-align: center; padding: 1.5rem 0 0.5rem 0; }
     .main-title span { color: #58a6ff; }
-    .subtitle { color: #8b949e; text-align: center; font-size: 0.95rem; padding-bottom: 1.5rem; border-bottom: 1px solid #21262d; }
+    .subtitle { color: #8b949e; text-align: center; font-size: 0.95rem; padding-bottom: 1rem; border-bottom: 1px solid #21262d; }
     
     .stTextInput > div > div > input { background-color: #0d1117 !important; border: 1px solid #30363d !important; border-radius: 6px !important; font-size: 1rem !important; padding: 0.75rem 1rem !important; color: #c9d1d9 !important; }
     .stTextInput > div > div > input:focus { border-color: #58a6ff !important; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3) !important; background-color: #161b22 !important; }
     .stTextInput > div > div > input::placeholder { color: #484f58 !important; }
     
-    .example-section { margin: 1.5rem 0; }
     .example-category { color: #8b949e; font-size: 0.85rem; margin: 1rem 0 0.5rem 0; padding-left: 0.5rem; border-left: 2px solid #30363d; }
-    .example-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
     
     .stats-bar { background-color: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 0.75rem 1rem; margin: 1rem 0; display: flex; gap: 1.5rem; color: #8b949e; font-size: 0.9rem; }
     .stats-bar strong { color: #f0f6fc; }
+    
+    .sync-section { background-color: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
+    .sync-title { color: #f0f6fc; font-weight: 600; margin-bottom: 0.5rem; }
     
     .result-card { background-color: #161b22; border: 1px solid #21262d; border-radius: 6px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
     .result-card:hover { border-color: #30363d; }
@@ -76,9 +78,12 @@ st.markdown("""
     .md-content em { color: #8b949e; font-style: italic; }
     .md-content hr { border: none; border-top: 1px solid #21262d; margin: 1rem 0; }
     .md-content p { margin: 0.5rem 0; }
-    .md-content img { max-width: 100%; border-radius: 6px; margin: 0.5rem 0; }
     
     .stSelectbox > div > div { background-color: #21262d; border: 1px solid #30363d; border-radius: 6px; }
+    
+    /* 进度条样式 */
+    .stProgress > div > div > div { background-color: #238636; }
+    .stProgress > div > div { background-color: #21262d; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -107,9 +112,31 @@ def get_obsidian_url(file_path: str):
     return f"obsidian://open?vault={OBSIDIAN_VAULT}&file={urllib.parse.quote(relative_path)}"
 
 
+def trigger_sync():
+    """触发全量同步"""
+    try:
+        response = httpx.post(f"{BACKEND_URL}/api/index", timeout=600.0)
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def get_stats():
+    """获取统计信息"""
+    try:
+        response = httpx.get(f"{BACKEND_URL}/api/stats", timeout=5.0)
+        return response.json()
+    except:
+        return None
+
+
 # ============== 初始化 Session State ==============
 if "search_query" not in st.session_state:
     st.session_state["search_query"] = ""
+if "syncing" not in st.session_state:
+    st.session_state["syncing"] = False
+if "sync_result" not in st.session_state:
+    st.session_state["sync_result"] = None
 
 # ============== Main UI ==============
 
@@ -117,7 +144,46 @@ if "search_query" not in st.session_state:
 st.markdown('<h1 class="main-title">🔍 <span>Obsidian</span> 语义检索</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">基于 BGE-M3 向量模型的知识库搜索引擎</p>', unsafe_allow_html=True)
 
-# 搜索框 - 使用 session_state
+# 同步区域
+st.markdown('<div class="sync-section">', unsafe_allow_html=True)
+st.markdown('<div class="sync-title">📂 向量库同步</div>', unsafe_allow_html=True)
+
+stats = get_stats()
+if stats:
+    st.markdown(f"""
+    <div style="display: flex; gap: 2rem; align-items: center; margin-bottom: 0.5rem;">
+        <span>📄 <strong>{stats['total_files']}</strong> 个文件已索引</span>
+        <span>📝 <strong>{stats['total_chunks']}</strong> 个文本块</span>
+        <span>🔄 实时监听: {'✅ 运行中' if stats.get('watcher_running') else '⏹️ 已停止'}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+sync_col1, sync_col2 = st.columns([1, 4])
+with sync_col1:
+    if st.button("🔄 全量同步", use_container_width=True, type="primary"):
+        st.session_state["syncing"] = True
+        st.session_state["sync_result"] = None
+
+if st.session_state["syncing"]:
+    with st.spinner("正在同步..."):
+        result = trigger_sync()
+        st.session_state["syncing"] = False
+        st.session_state["sync_result"] = result
+        st.rerun()
+
+if st.session_state["sync_result"]:
+    result = st.session_state["sync_result"]
+    if result.get("status") == "success":
+        st.success(f"✅ {result['message']} | {result['chunks_created']} chunks | {result['took_seconds']}s")
+        st.session_state["sync_result"] = None
+    elif result.get("status") == "error":
+        st.error(f"❌ {result['message']}")
+    else:
+        st.warning(f"⚠️ {result.get('error', '同步失败')}")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# 搜索框
 col_search, col_k = st.columns([5, 1])
 with col_search:
     query = st.text_input(
@@ -130,10 +196,8 @@ with col_search:
 with col_k:
     top_k = st.selectbox("结果", [5, 10, 15, 20], index=1, label_visibility="collapsed")
 
-# 示例查询 - 仅在没有搜索内容时显示
+# 示例查询
 if not query:
-    st.markdown('<div class="example-section">', unsafe_allow_html=True)
-    
     # Web 安全
     st.markdown('<div class="example-category">🌐 Web 安全</div>', unsafe_allow_html=True)
     cols = st.columns(4)
@@ -169,12 +233,9 @@ if not query:
         if cols[i].button(ex, key=f"crypto_{i}", use_container_width=True):
             st.session_state["search_query"] = ex
             st.rerun()
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # 执行搜索
 if query:
-    # 清空 session_state 以便下次搜索
     st.session_state["search_query"] = ""
     
     with st.spinner(""):
