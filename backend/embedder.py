@@ -10,6 +10,7 @@ import logging
 from collections import OrderedDict
 
 from .config import settings
+from .cache import PersistentCache, get_cache_key
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -118,7 +119,21 @@ class Embedder:
 
         # 延迟加载模型
         self._model = None
-        self._cache = LRUCache(max_size=cache_size)  # LRU 缓存
+
+        # 初始化缓存（优先使用持久化缓存）
+        self._persistent_cache: Optional[PersistentCache] = None
+        self._memory_cache = LRUCache(max_size=cache_size)  # 内存缓存作为二级缓存
+
+        if settings.cache_enabled:
+            try:
+                self._persistent_cache = PersistentCache(
+                    db_path=settings.cache_db_path,
+                    max_size=50000
+                )
+                logger.info(f"持久化缓存已启用: {settings.cache_db_path}")
+            except Exception as e:
+                logger.warning(f"持久化缓存初始化失败，使用内存缓存: {e}")
+                self._persistent_cache = None
 
     def _get_device(self, device: Optional[str] = None) -> str:
         """确定计算设备"""
@@ -162,14 +177,25 @@ class Embedder:
         if not texts:
             return []
 
-        # 第一阶段：检查缓存（LRUCache 已线程安全）
+        # 第一阶段：检查缓存
         embeddings = []
         uncached_texts = []
         uncached_indices = []
 
         for i, text in enumerate(texts):
             cache_key = self._get_cache_key(text)
-            cached = self._cache.get(cache_key)
+            cached = None
+
+            # 优先检查内存缓存（更快）
+            cached = self._memory_cache.get(cache_key)
+
+            # 再检查持久化缓存
+            if cached is None and self._persistent_cache:
+                cached = self._persistent_cache.get(cache_key)
+                if cached:
+                    # 回填到内存缓存
+                    self._memory_cache.set(cache_key, cached)
+
             if cached is not None:
                 embeddings.append(cached)
             else:
@@ -200,11 +226,19 @@ class Embedder:
                 )
                 all_new_embeddings.extend(batch_embeddings)
 
-            # 第三阶段：更新缓存（LRUCache 已线程安全）
+            # 第三阶段：更新缓存
             for idx, text, emb in zip(uncached_indices, uncached_texts, all_new_embeddings):
                 cache_key = self._get_cache_key(text)
-                self._cache.set(cache_key, emb.tolist())
-                embeddings[idx] = emb.tolist()
+                emb_list = emb.tolist()
+
+                # 更新内存缓存
+                self._memory_cache.set(cache_key, emb_list)
+
+                # 更新持久化缓存
+                if self._persistent_cache:
+                    self._persistent_cache.set(cache_key, emb_list)
+
+                embeddings[idx] = emb_list
 
             # 清理
             del all_new_embeddings
@@ -225,11 +259,23 @@ class Embedder:
     
     def clear_cache(self):
         """清空缓存"""
-        self._cache.clear()
+        self._memory_cache.clear()
+        if self._persistent_cache:
+            self._persistent_cache.clear()
 
     def get_cache_size(self) -> int:
-        """获取缓存大小"""
-        return len(self._cache)
+        """获取内存缓存大小"""
+        return len(self._memory_cache)
+
+    def get_cache_stats(self) -> dict:
+        """获取缓存统计"""
+        stats = {
+            "memory_cache_size": len(self._memory_cache),
+            "persistent_cache_enabled": self._persistent_cache is not None
+        }
+        if self._persistent_cache:
+            stats["persistent_cache"] = self._persistent_cache.get_stats()
+        return stats
 
     def get_embedding_dim(self) -> int:
         """获取向量维度"""

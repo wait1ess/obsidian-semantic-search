@@ -13,6 +13,8 @@
 - **📝 Markdown 渲染** — 搜索结果保持原始格式
 - **🔗 Obsidian 跳转** — 点击直接在 Obsidian 中打开笔记
 - **👁️ 实时同步** — 自动监听文件变更并更新索引
+- **⚡ 并行索引** — 多线程并行处理，大幅提升索引速度
+- **💾 持久化缓存** — SQLite 缓存向量，重启后秒开
 - **🎨 GitHub 风格 UI** — 简洁美观的深色主题
 
 ## 🚀 快速开始
@@ -103,10 +105,14 @@ obsidian-semantic-search/
 │   ├── vectorstore.py   # ChromaDB 封装
 │   ├── chunker.py       # Markdown 分块
 │   ├── watcher.py       # 文件监听
+│   ├── cache.py         # 持久化缓存
+│   ├── exceptions.py    # 自定义异常
 │   └── config.py        # 配置管理
 ├── ui/                   # Web UI
 │   └── app.py           # Streamlit 应用
-├── data/chroma/          # 向量库数据
+├── data/
+│   ├── chroma/          # 向量库数据
+│   └── cache/           # 持久化缓存
 ├── scripts/              # 辅助脚本
 ├── requirements.txt      # Python 依赖
 └── README.md
@@ -141,7 +147,18 @@ curl -X POST http://localhost:8000/api/search \
 | `CHUNK_SIZE` | 512 | 文本块大小 |
 | `CHUNK_OVERLAP` | 50 | 块重叠大小 |
 | `EMBEDDING_BATCH_SIZE` | 8 | 批处理大小 |
+| `INDEX_WORKERS` | 4 | 并行索引线程数 |
+| `CACHE_ENABLED` | true | 是否启用持久化缓存 |
 | `LOG_LEVEL` | INFO | 日志级别: DEBUG/INFO/WARNING/ERROR |
+
+## 📈 版本历史
+
+| 版本 | 说明 |
+|------|------|
+| v0.5.0 | 并行索引、持久化缓存、自定义异常类 |
+| v0.4.0 | LRU缓存、日志级别控制、修复file_path空值 |
+| v0.3.9 | 读写锁，索引期间搜索不阻塞 |
+| v0.3.8 | 全量索引后台线程执行 |
 
 ## 🤝 贡献
 

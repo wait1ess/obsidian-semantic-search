@@ -1,6 +1,7 @@
 """FastAPI 主服务"""
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -10,12 +11,19 @@ from datetime import datetime
 import os
 import threading
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import settings
 from .embedder import get_embedder
 from .vectorstore import get_vectorstore
 from .chunker import MarkdownChunker
 from .watcher import init_watcher, get_watcher
+from .exceptions import (
+    ObsidianRAGError,
+    IndexingError,
+    VaultNotFoundError,
+    IndexAlreadyRunningError
+)
 
 # 配置日志
 logging.basicConfig(
@@ -148,7 +156,7 @@ class HealthResponse(BaseModel):
 app = FastAPI(
     title="Obsidian RAG API",
     description="Obsidian Vault 语义检索系统",
-    version="0.1.0"
+    version="0.5.0"
 )
 
 # CORS
@@ -159,6 +167,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ============== Exception Handlers ==============
+
+@app.exception_handler(ObsidianRAGError)
+async def obsidian_rag_exception_handler(request, exc: ObsidianRAGError):
+    """自定义异常处理"""
+    return JSONResponse(
+        status_code=400,
+        content=exc.to_dict()
+    )
 
 
 # ============== Global State ==============
@@ -184,21 +203,28 @@ def get_chunker() -> MarkdownChunker:
 @app.on_event("startup")
 async def startup():
     """启动时初始化"""
+    # 验证 Vault 路径
+    if not settings.vault_path.exists():
+        raise VaultNotFoundError(
+            f"Obsidian Vault 路径不存在: {settings.vault_path}",
+            details="请检查 OBSIDIAN_VAULT_PATH 环境变量配置"
+        )
+
     # 确保 ChromaDB 目录存在
     settings.chroma_path.mkdir(parents=True, exist_ok=True)
-    
+
     # 初始化 Embedder（预加载模型）
-    print("正在初始化 Embedding 模型...")
+    logger.info("正在初始化 Embedding 模型...")
     get_embedder()
-    
+
     # 初始化文件监听
     watcher = init_watcher(
         settings.vault_path,
         on_file_change=handle_file_change
     )
     watcher.start()
-    
-    print("🚀 服务启动完成")
+
+    logger.info("🚀 服务启动完成")
 
 
 @app.on_event("shutdown")
@@ -207,7 +233,14 @@ async def shutdown():
     watcher = get_watcher()
     if watcher:
         watcher.stop()
-    print("👋 服务已关闭")
+
+    # 清理缓存连接
+    from .embedder import get_embedder
+    embedder = get_embedder()
+    if embedder._persistent_cache:
+        embedder._persistent_cache.close()
+
+    logger.info("👋 服务已关闭")
 
 
 # ============== File Change Handler ==============
@@ -220,25 +253,25 @@ def handle_file_change(path: Path, event_type: str):
             rel_path = str(path.relative_to(settings.vault_path))
             store = get_vectorstore()
             deleted = store.delete_by_source(rel_path)
-            print(f"已删除 {deleted} 个 chunks: {rel_path}")
-            
+            logger.info(f"已删除 {deleted} 个 chunks: {rel_path}")
+
             # 更新 watcher 记录
             watcher = get_watcher()
             if watcher:
                 watcher.remove_indexed(path)
         except Exception as e:
-            print(f"删除失败: {path} - {e}")
-    
+            logger.error(f"删除失败: {path} - {e}")
+
     elif event_type in ("created", "modified"):
         # 索引文件
         try:
             index_single_file(path)
-            
+
             watcher = get_watcher()
             if watcher:
                 watcher.mark_indexed(path)
         except Exception as e:
-            print(f"索引失败: {path} - {e}")
+            logger.error(f"索引失败: {path} - {e}")
 
 
 def index_single_file(file_path: Path) -> int:
@@ -326,7 +359,7 @@ async def search(request: SearchRequest):
 
 @app.post("/api/index", response_model=IndexResponse)
 async def full_index(background_tasks: BackgroundTasks):
-    """全量索引 - 异步后台执行"""
+    """全量索引 - 异步后台并行执行"""
     global _indexing
 
     if _indexing or index_progress.is_running:
@@ -337,8 +370,16 @@ async def full_index(background_tasks: BackgroundTasks):
 
     _indexing = True
 
+    def index_file_task(file_path: Path) -> tuple:
+        """单个文件索引任务（用于并行执行）"""
+        try:
+            chunks = index_single_file(file_path)
+            return (file_path, chunks, None)
+        except Exception as e:
+            return (file_path, 0, str(e))
+
     def run_index():
-        """在后台线程中执行索引"""
+        """在后台线程中执行并行索引"""
         try:
             # 扫描所有 .md 文件
             md_files = list(settings.vault_path.rglob("*.md"))
@@ -348,35 +389,46 @@ async def full_index(background_tasks: BackgroundTasks):
 
             # 初始化进度
             index_progress.start(len(md_files))
+            logger.info(f"开始并行索引 {len(md_files)} 个文件，使用 {settings.index_workers} 个线程")
 
-            # 索引
+            # 使用线程池并行处理
             total_chunks = 0
             indexed_files = 0
+            failed_files = 0
 
-            for i, md_file in enumerate(md_files):
-                try:
-                    chunks = index_single_file(md_file)
-                    total_chunks += chunks
-                    indexed_files += 1
+            with ThreadPoolExecutor(max_workers=settings.index_workers) as executor:
+                # 提交所有任务
+                future_to_file = {
+                    executor.submit(index_file_task, f): f
+                    for f in md_files
+                }
+
+                # 收集结果
+                for i, future in enumerate(as_completed(future_to_file)):
+                    file_path, chunks, error = future.result()
+
+                    if error:
+                        logger.warning(f"索引失败: {file_path} - {error}")
+                        failed_files += 1
+                    else:
+                        total_chunks += chunks
+                        indexed_files += 1
+
+                        # 更新 watcher 记录
+                        watcher = get_watcher()
+                        if watcher:
+                            watcher.mark_indexed(file_path)
 
                     # 更新进度
-                    rel_path = str(md_file.relative_to(settings.vault_path))
+                    rel_path = str(file_path.relative_to(settings.vault_path))
                     index_progress.update(i + 1, total_chunks, rel_path)
-
-                    # 更新 watcher 记录
-                    watcher = get_watcher()
-                    if watcher:
-                        watcher.mark_indexed(md_file)
-
-                except Exception as e:
-                    print(f"索引失败: {md_file} - {e}")
 
             # 完成
             index_progress.complete(total_chunks)
-            print(f"✅ 索引完成: {indexed_files} 文件, {total_chunks} 文本块")
+            logger.info(f"✅ 索引完成: {indexed_files} 文件, {total_chunks} 文本块, {failed_files} 失败")
 
         except Exception as e:
-            print(f"❌ 索引错误: {e}")
+            logger.error(f"❌ 索引错误: {e}")
             index_progress.error(str(e))
 
         finally:
@@ -389,7 +441,7 @@ async def full_index(background_tasks: BackgroundTasks):
 
     return IndexResponse(
         status="success",
-        message="索引任务已启动，请轮询 /api/index/progress 获取进度"
+        message=f"索引任务已启动（{settings.index_workers} 线程并行），请轮询 /api/index/progress 获取进度"
     )
 
 

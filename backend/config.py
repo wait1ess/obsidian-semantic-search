@@ -64,7 +64,23 @@ class Settings(BaseSettings):
         default=2.0,
         description="文件变更防抖时间（秒）"
     )
-    
+
+    # Indexing
+    index_workers: int = Field(
+        default=4,
+        description="并行索引线程数"
+    )
+
+    # Cache
+    cache_db_path: str = Field(
+        default="./data/cache/embeddings.db",
+        description="持久化缓存数据库路径"
+    )
+    cache_enabled: bool = Field(
+        default=True,
+        description="是否启用持久化缓存"
+    )
+
     @property
     def vault_path(self) -> Path:
         """获取 Vault Path 对象"""
