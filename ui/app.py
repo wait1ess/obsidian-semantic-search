@@ -212,10 +212,10 @@ elif progress.get("status") == "completed":
     # 显示完成状态
     msg = progress.get("message", "")
     st.success(f"✅ {msg}")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 显示重新同步按钮
 
-else:
-    # 同步按钮
+# 同步按钮（在 idle 和 completed 状态下都显示）
+if not progress.get("is_running"):
     if st.button("🔄 全量同步", type="primary", use_container_width=True):
         with st.spinner("触发同步..."):
             result = trigger_sync()
