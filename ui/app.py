@@ -163,10 +163,6 @@ def get_obsidian_url(file_path: str):
     return f"obsidian://open?vault={OBSIDIAN_VAULT}&file={urllib.parse.quote(relative_path)}"
 
 
-# ============== Session State ==============
-if "query" not in st.session_state:
-    st.session_state.query = ""
-
 # ============== UI ==============
 
 # 标题 - 简洁
@@ -233,7 +229,7 @@ col_search, col_k = st.columns([5, 1])
 with col_search:
     query = st.text_input(
         "搜索",
-        value=st.session_state.query,
+        key="search_input",
         placeholder="搜索你的知识库...",
         label_visibility="collapsed"
     )
@@ -246,34 +242,32 @@ if not query:
     cols = st.columns(4)
     for i, ex in enumerate(["SQL注入绕过WAF", "XSS窃取Cookie", "CSRF攻击原理", "SSRF内网探测"]):
         if cols[i].button(ex, key=f"web_{i}", use_container_width=True):
-            st.session_state.query = ex
+            st.session_state.search_input = ex
             st.rerun()
 
     st.markdown('<div class="example-category">渗透测试</div>', unsafe_allow_html=True)
     cols = st.columns(4)
     for i, ex in enumerate(["内网横向移动", "权限提升方法", "凭据窃取技术", "免杀绕过技巧"]):
         if cols[i].button(ex, key=f"pentest_{i}", use_container_width=True):
-            st.session_state.query = ex
+            st.session_state.search_input = ex
             st.rerun()
 
     st.markdown('<div class="example-category">云安全</div>', unsafe_allow_html=True)
     cols = st.columns(4)
     for i, ex in enumerate(["Docker逃逸方法", "Kubernetes攻击", "AWS IAM提权", "容器安全配置"]):
         if cols[i].button(ex, key=f"cloud_{i}", use_container_width=True):
-            st.session_state.query = ex
+            st.session_state.search_input = ex
             st.rerun()
 
     st.markdown('<div class="example-category">密码学</div>', unsafe_allow_html=True)
     cols = st.columns(4)
     for i, ex in enumerate(["RSA攻击方法", "AES加密模式", "哈希碰撞攻击", "证书伪造技术"]):
         if cols[i].button(ex, key=f"crypto_{i}", use_container_width=True):
-            st.session_state.query = ex
+            st.session_state.search_input = ex
             st.rerun()
 
 # ===== 搜索结果 =====
 if query:
-    st.session_state.query = ""
-
     with st.spinner("搜索中..."):
         result = search(query, top_k)
 
